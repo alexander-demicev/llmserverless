@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-autoscaler
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-autoscaler
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "replicationcontrollers", "persistentvolumeclaims", "persistentvolumes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/eviction"]
+  verbs: ["create"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses", "csinodes", "csidrivers", "csistoragecapacities"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cluster.x-k8s.io"]
+  resources: ["machinedeployments", "machinedeployments/scale"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["cluster.x-k8s.io"]
+  resources: ["machines", "machinesets", "machinepools"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["infrastructure.cluster.x-k8s.io"]
+  resources: ["dockermachinetemplates"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["delete", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-autoscaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-autoscaler
+subjects:
+- kind: ServiceAccount
+  name: cluster-autoscaler
+  namespace: default
+# ---
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: workload-kubeconfig-secret
+#   namespace: kube-system
+# type: Opaque
+# data:
+#   kubeconfig: ""
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-autoscaler
+  namespace: default
+  labels:
+    app: cluster-autoscaler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cluster-autoscaler
+  template:
+    metadata:
+      labels:
+        app: cluster-autoscaler
+    spec:
+      serviceAccountName: cluster-autoscaler
+      containers:
+      - image: registry.k8s.io/autoscaling/cluster-autoscaler:v1.28.0
+        name: cluster-autoscaler
+        command:
+        - ./cluster-autoscaler
+        - --cloud-provider=clusterapi
+        - --node-group-auto-discovery=clusterapi:namespace=default,clusterName=llm-workload
+        - --kubeconfig=/etc/kubernetes/workload-kubeconfig/kubeconfig
+        - --clusterapi-cloud-config-authoritative
+        - --balance-similar-node-groups
+        - --enforce-node-group-min-size
+        - --scale-down-enabled=true
+        - --scale-down-delay-after-add=10m
+        - --scale-down-unneeded-time=10m
+        - --skip-nodes-with-local-storage=false
+        - --skip-nodes-with-system-pods=false
+        - --v=4
+        volumeMounts:
+        - name: workload-kubeconfig
+          mountPath: /etc/kubernetes/workload-kubeconfig
+          readOnly: true
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+      volumes:
+      - name: workload-kubeconfig
+        secret:
+          secretName: llm-workload-kubeconfig
+          items:
+          - key: value
+            path: kubeconfig

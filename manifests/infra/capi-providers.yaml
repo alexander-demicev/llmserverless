@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: capi-kubeadm-bootstrap-system
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: kubeadm-bootstrap
+  namespace: capi-kubeadm-bootstrap-system
+spec:
+  name: kubeadm
+  type: bootstrap
+  version: v1.10.6
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: capi-kubeadm-control-plane-system
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: kubeadm-control-plane
+  namespace: capi-kubeadm-control-plane-system
+spec:
+  name: kubeadm
+  type: controlPlane
+  version: v1.10.6
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: capd-system
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: docker
+  namespace: capd-system
+spec:
+  type: infrastructure
+  version: v1.10.6
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleet-addon-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleet-addon-config
+  namespace: fleet-addon-system
+data:
+  manifests: |-
+    apiVersion: addons.cluster.x-k8s.io/v1alpha1
+    kind: FleetAddonConfig
+    metadata:
+      name: fleet-addon-config
+    spec:
+      config:
+        featureGates:
+          configMap:
+            ref:
+              kind: ConfigMap
+              apiVersion: v1
+              name: rancher-config
+              namespace: cattle-system
+          experimentalOciStorage: true
+          experimentalHelmOps: true
+      clusterClass:
+        patchResource: true
+        setOwnerReferences: true
+      cluster:
+        agentNamespace: cattle-fleet-system
+        applyClassGroup: true
+        patchResource: true
+        setOwnerReferences: true
+        hostNetwork: true
+        selector:
+          matchLabels:
+            cluster-api.cattle.io/rancher-auto-import: "true"
+          matchExpressions:
+            - key: cluster-api.cattle.io/disable-fleet-auto-import
+              operator: DoesNotExist
+        namespaceSelector:
+          matchLabels:
+            cluster-api.cattle.io/rancher-auto-import: "true"
+          matchExpressions:
+            - key: cluster-api.cattle.io/disable-fleet-auto-import
+              operator: DoesNotExist
+    ---
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: cappf-controller-psa
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: fleet-controller-psa
+    subjects:
+    - kind: ServiceAccount
+      name: caapf-controller-manager
+      namespace: fleet-addon-system
+---
+apiVersion: turtles-capi.cattle.io/v1alpha1
+kind: CAPIProvider
+metadata:
+  name: fleet
+  namespace: fleet-addon-system
+spec:
+  name: rancher-fleet
+  type: addon
+  enableAutomaticUpdate: true
+  additionalManifests:
+    name: fleet-addon-config
+    namespace: fleet-addon-system

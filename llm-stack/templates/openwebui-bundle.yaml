@@ -1,0 +1,53 @@
+kind: Bundle
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: openwebui
+spec:
+  resources:
+  - content: |-
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: openwebui
+        namespace: default
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: openwebui
+        template:
+          metadata:
+            labels:
+              app: openwebui
+          spec:
+            containers:
+            - name: openwebui
+              image: ghcr.io/open-webui/open-webui:v0.6.10
+              ports:
+              - containerPort: 8080
+              env:
+              - name: OPENAI_API_BASE_URL
+                value: "http://litellm-service:4000"
+              - name: OPENAI_API_KEY
+                value: "test-master-key"
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: openwebui-service
+        namespace: default
+      spec:
+        selector:
+          app: openwebui
+        ports:
+        - port: 8080
+          targetPort: 8080
+    name: openwebui.yaml
+  targets:
+  - clusterSelector:
+      matchExpressions:
+      - key: clusterclass-name.fleet.addons.cluster.x-k8s.io
+        operator: In
+        values:
+        - docker-llm-clusterclass

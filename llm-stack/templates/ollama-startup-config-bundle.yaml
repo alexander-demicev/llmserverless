@@ -1,0 +1,70 @@
+kind: Bundle
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: ollama-startup-config
+spec:
+  resources:
+  - content: |-
+      ---
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: ollama-startup-script
+        namespace: default
+      data:
+        startup.sh: |
+          #!/bin/sh
+          set -e
+          
+          ollama serve &
+          SERVER_PID=$!
+          
+          echo "Waiting for Ollama server to initialize..."
+          sleep 15
+          
+          model_exists() {
+            ollama list | grep -q "$1"
+            return $?
+          }
+          
+          if ! model_exists "tinyllama"; then
+            echo "Pulling tinyllama..."
+            ollama pull tinyllama || echo "Failed to pull tinyllama, will try again later"
+          else
+            echo "tinyllama already exists"
+          fi
+          
+          # if ! model_exists "llama3"; then
+          #   echo "Pulling llama3..."
+          #   ollama pull llama3 || echo "Failed to pull llama3, will try again later"
+          # else
+          #   echo "llama3 already exists"
+          # fi d
+          
+          # if ! model_exists "deepseek-r1"; then
+          #   echo "Pulling deepseek-r1..."
+          #   ollama pull deepseek-r1 || echo "Failed to pull deepseek-r1, will try again later"
+          # else
+          #   echo "deepseek-r1 already exists"
+          # fi
+          
+          echo "Ollama models check completed"
+          
+          # Check if server is still running
+          if kill -0 $SERVER_PID 2>/dev/null; then
+            echo "Ollama server is running"
+            touch /tmp/model_ready
+          else
+            echo "Ollama server stopped, restarting..."
+            ollama serve &
+          fi
+
+          wait $SERVER_PID
+    name: ollama-startup-config.yaml
+  targets:
+  - clusterSelector:
+      matchExpressions:
+      - key: clusterclass-name.fleet.addons.cluster.x-k8s.io
+        operator: In
+        values:
+        - docker-llm-clusterclass

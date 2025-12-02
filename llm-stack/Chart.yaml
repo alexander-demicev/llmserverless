@@ -1,0 +1,15 @@
+apiVersion: v2
+name: llm-stack
+description: A Helm chart for LLM serverless stack with Knative, Ollama, LiteLLM, and OpenWebUI
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - llm
+  - knative
+  - ollama
+  - litellm
+  - openwebui
+maintainers:
+  - name: Your Name
+    email: your.email@example.com

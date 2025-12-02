@@ -1,0 +1,68 @@
+kind: Bundle
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: litellm
+spec:
+  resources:
+  - content: |-
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: litellm
+        namespace: default
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: litellm
+        template:
+          metadata:
+            labels:
+              app: litellm
+          spec:
+            containers:
+            - name: litellm
+              image: ghcr.io/berriai/litellm:main-v1.67.4-stable
+              command: ["litellm", "--config", "/app/config.yaml"]
+              ports:
+              - containerPort: 4000
+              env:
+              - name: LITELLM_MASTER_KEY
+                value: "test-master-key"
+              resources:
+                requests:
+                  memory: "128Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "384Mi"
+                  cpu: "500m"
+              volumeMounts:
+              - name: config-volume
+                mountPath: /app/config.yaml
+                subPath: config.yaml
+            volumes:
+            - name: config-volume
+              configMap:
+                name: litellm-config
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: litellm-service
+        namespace: default
+      spec:
+        selector:
+          app: litellm
+        ports:
+        - protocol: TCP
+          port: 4000
+          targetPort: 4000
+    name: litellm.yaml
+  targets:
+  - clusterSelector:
+      matchExpressions:
+      - key: clusterclass-name.fleet.addons.cluster.x-k8s.io
+        operator: In
+        values:
+        - docker-llm-clusterclass

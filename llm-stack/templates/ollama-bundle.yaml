@@ -1,0 +1,86 @@
+kind: Bundle
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: ollama
+spec:
+  resources:
+  - content: |-
+      ---
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      metadata:
+        name: ollama
+        namespace: default
+      spec:
+        template:
+          metadata:
+            annotations:
+              autoscaling.knative.dev/min-scale: "1"
+              autoscaling.knative.dev/max-scale: "5"
+              autoscaling.knative.dev/metric: "concurrency"
+              autoscaling.knative.dev/target: "1"
+              autoscaling.knative.dev/window: "30s"
+            labels:
+              app: ollama
+          spec:
+            terminationGracePeriodSeconds: 30
+            containers:
+            - name: ollama
+              image: ollama/ollama:latest
+              ports:
+              - name: http1
+                containerPort: 11434
+              command: ["/bin/sh", "/startup.sh"]
+              volumeMounts:
+              - name: startup-script
+                mountPath: /startup.sh
+                subPath: startup.sh
+              - name: ollama-data
+                mountPath: /root/.ollama
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "4Gi"
+                limits:
+                  cpu: "2"
+                  memory: "8Gi"
+              readinessProbe:
+                exec:
+                  command:
+                  - /bin/sh
+                  - -c
+                  - test -f /tmp/model_ready
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                failureThreshold: 60
+            volumes:
+            - name: startup-script
+              configMap:
+                name: ollama-startup-script
+                defaultMode: 0755
+            - name: ollama-data
+              emptyDir: {}
+        traffic:
+        - percent: 100
+          latestRevision: true
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: ollama-service
+        namespace: default
+      spec:
+        selector:
+          app: ollama
+        ports:
+        - protocol: TCP
+          port: 11434
+          targetPort: 11434
+    name: ollama.yaml
+  targets:
+  - clusterSelector:
+      matchExpressions:
+      - key: clusterclass-name.fleet.addons.cluster.x-k8s.io
+        operator: In
+        values:
+        - docker-llm-clusterclass

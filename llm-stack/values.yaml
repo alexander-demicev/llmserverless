@@ -1,0 +1,3 @@
+# Provider configuration
+# Options: "docker" (installs ClusterClass + apps), "apps" (installs apps only), or other values (apps only)
+provider: "apps"
