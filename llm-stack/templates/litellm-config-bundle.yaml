@@ -1,3 +1,7 @@
+# LiteLLM Configuration Bundle
+# Note: The master_key in general_settings references the LITELLM_MASTER_KEY env var
+# which is loaded from llm-secrets Secret in the deployment.
+# The OpenAI API key is also loaded from the secret via environment variable.
 kind: Bundle
 apiVersion: fleet.cattle.io/v1alpha1
 metadata:
@@ -21,14 +25,16 @@ spec:
             - model_name: openai/gpt-3.5-turbo
               litellm_params:
                 model: gpt-3.5-turbo
-                api_key: sk-xxx-your-openai-key-here
+                # API key is loaded from OPENAI_API_KEY environment variable
+                api_key: os.environ/OPENAI_API_KEY
           litellm_settings:
             drop_params: false
-            debug: true
+            debug: false
             default_model: ollama/tinyllama
           general_settings:
             authentication:
-              master_key: "test-master-key"
+              # Master key is loaded from LITELLM_MASTER_KEY environment variable
+              master_key: os.environ/LITELLM_MASTER_KEY
     name: litellm-config.yaml
   targets:
   - clusterSelector:
@@ -37,7 +43,3 @@ spec:
         operator: In
         values:
         - docker-llm-clusterclass
-#      - model_name: ollama/llama3
-#        litellm_params:
-#          model: ollama/llama3
-#          api_base: http://ollama.default.svc.cluster.local

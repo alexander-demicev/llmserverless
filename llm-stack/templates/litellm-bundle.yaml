@@ -1,3 +1,5 @@
+# LiteLLM Deployment Bundle
+# Requires: llm-secrets Secret to be deployed first (see llm-secrets-bundle.yaml)
 kind: Bundle
 apiVersion: fleet.cattle.io/v1alpha1
 metadata:
@@ -12,7 +14,7 @@ spec:
         name: litellm
         namespace: default
       spec:
-        replicas: 1
+        replicas: {{ .Values.litellm.replicas }}
         selector:
           matchLabels:
             app: litellm
@@ -21,22 +23,56 @@ spec:
             labels:
               app: litellm
           spec:
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        app: litellm
+                    topologyKey: kubernetes.io/hostname
             containers:
             - name: litellm
-              image: ghcr.io/berriai/litellm:main-v1.67.4-stable
+              image: {{ .Values.images.litellm.repository }}:{{ .Values.images.litellm.tag }}
               command: ["litellm", "--config", "/app/config.yaml"]
               ports:
               - containerPort: 4000
+                name: http
               env:
               - name: LITELLM_MASTER_KEY
-                value: "test-master-key"
+                valueFrom:
+                  secretKeyRef:
+                    name: llm-secrets
+                    key: LITELLM_MASTER_KEY
+              - name: OPENAI_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: llm-secrets
+                    key: OPENAI_API_KEY
               resources:
                 requests:
-                  memory: "128Mi"
-                  cpu: "250m"
+                  memory: {{ .Values.litellm.resources.requests.memory | quote }}
+                  cpu: {{ .Values.litellm.resources.requests.cpu | quote }}
                 limits:
-                  memory: "384Mi"
-                  cpu: "500m"
+                  memory: {{ .Values.litellm.resources.limits.memory | quote }}
+                  cpu: {{ .Values.litellm.resources.limits.cpu | quote }}
+              livenessProbe:
+                httpGet:
+                  path: /health/liveliness
+                  port: 4000
+                initialDelaySeconds: 10
+                periodSeconds: 15
+                timeoutSeconds: 5
+                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /health/readiness
+                  port: 4000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                timeoutSeconds: 5
+                failureThreshold: 3
               volumeMounts:
               - name: config-volume
                 mountPath: /app/config.yaml
@@ -51,14 +87,20 @@ spec:
       metadata:
         name: litellm-service
         namespace: default
+        labels:
+          app: litellm
       spec:
         selector:
           app: litellm
         ports:
-        - protocol: TCP
+        - name: http
+          protocol: TCP
           port: 4000
           targetPort: 4000
     name: litellm.yaml
+  dependsOn:
+  - name: llm-secrets
+  - name: litellm-config
   targets:
   - clusterSelector:
       matchExpressions:

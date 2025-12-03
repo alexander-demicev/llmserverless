@@ -1,3 +1,47 @@
 # Provider configuration
 # Options: "docker" (installs ClusterClass + apps), "apps" (installs apps only), or other values (apps only)
 provider: "apps"
+
+# Image configuration
+images:
+  litellm:
+    repository: ghcr.io/berriai/litellm
+    tag: main-v1.67.4-stable
+  openwebui:
+    repository: ghcr.io/open-webui/open-webui
+    tag: v0.6.10
+  ollama:
+    repository: ollama/ollama
+    tag: "0.5.4"
+
+# LiteLLM configuration
+litellm:
+  replicas: 2
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "250m"
+    limits:
+      memory: "384Mi"
+      cpu: "500m"
+
+# OpenWebUI configuration
+openwebui:
+  replicas: 1
+
+# Ollama configuration
+ollama:
+  autoscaling:
+    minScale: 1
+    maxScale: 5
+    target: 1
+    window: "30s"
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "500m"
+    limits:
+      memory: "8Gi"
+      cpu: "2"
+  # Default model to pull on startup
+  model: "qwen2.5:0.5b"

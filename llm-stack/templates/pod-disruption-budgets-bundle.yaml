@@ -1,0 +1,43 @@
+# Pod Disruption Budgets Bundle
+# Ensures high availability during voluntary disruptions (upgrades, node drains)
+kind: Bundle
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: pod-disruption-budgets
+spec:
+  resources:
+  - content: |-
+      ---
+      # LiteLLM PDB - ensure at least 1 replica is available during disruptions
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: litellm-pdb
+        namespace: default
+      spec:
+        minAvailable: 1
+        selector:
+          matchLabels:
+            app: litellm
+      ---
+      # OpenWebUI PDB - ensure availability during disruptions
+      # Note: With single replica, this prevents voluntary eviction
+      # Increase replicas for true HA
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: openwebui-pdb
+        namespace: default
+      spec:
+        maxUnavailable: 0
+        selector:
+          matchLabels:
+            app: openwebui
+    name: pod-disruption-budgets.yaml
+  targets:
+  - clusterSelector:
+      matchExpressions:
+      - key: clusterclass-name.fleet.addons.cluster.x-k8s.io
+        operator: In
+        values:
+        - docker-llm-clusterclass

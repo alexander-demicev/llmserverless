@@ -6,8 +6,11 @@ spec:
   targets:
     - name: local-path-storage
       clusterSelector:
-        matchLabels:
-          clusterclass-name.fleet.addons.cluster.x-k8s.io: docker-llm-clusterclass
+        matchExpressions:
+        - key: clusterclass-name.fleet.addons.cluster.x-k8s.io
+          operator: In
+          values:
+          - docker-llm-clusterclass
   resources:
     - name: local-path-storage
       content: |

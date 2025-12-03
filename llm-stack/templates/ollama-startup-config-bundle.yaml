@@ -27,11 +27,12 @@ spec:
             return $?
           }
           
-          if ! model_exists "tinyllama"; then
-            echo "Pulling tinyllama..."
-            ollama pull tinyllama || echo "Failed to pull tinyllama, will try again later"
+          MODEL="{{ .Values.ollama.model }}"
+          if ! model_exists "$MODEL"; then
+            echo "Pulling $MODEL..."
+            ollama pull "$MODEL" || echo "Failed to pull $MODEL, will try again later"
           else
-            echo "tinyllama already exists"
+            echo "$MODEL already exists"
           fi
           
           # if ! model_exists "llama3"; then

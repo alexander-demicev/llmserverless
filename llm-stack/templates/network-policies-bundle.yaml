@@ -1,0 +1,165 @@
+# Network Policies Bundle
+# Restricts pod-to-pod communication in the default namespace
+# Only allows traffic between LLM stack components
+kind: Bundle
+apiVersion: fleet.cattle.io/v1alpha1
+metadata:
+  name: network-policies
+spec:
+  resources:
+  - content: |-
+      ---
+      # Default deny all ingress traffic
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: default-deny-ingress
+        namespace: default
+      spec:
+        podSelector: {}
+        policyTypes:
+        - Ingress
+      ---
+      # Allow OpenWebUI to receive external traffic and talk to LiteLLM
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: openwebui-policy
+        namespace: default
+      spec:
+        podSelector:
+          matchLabels:
+            app: openwebui
+        policyTypes:
+        - Ingress
+        - Egress
+        ingress:
+        - ports:
+          - protocol: TCP
+            port: 8080
+        egress:
+        - to:
+          - podSelector:
+              matchLabels:
+                app: litellm
+          ports:
+          - protocol: TCP
+            port: 4000
+        - to:
+          - namespaceSelector: {}
+            podSelector:
+              matchLabels:
+                k8s-app: kube-dns
+          ports:
+          - protocol: UDP
+            port: 53
+      ---
+      # Allow LiteLLM to receive traffic from OpenWebUI and talk to Ollama
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: litellm-policy
+        namespace: default
+      spec:
+        podSelector:
+          matchLabels:
+            app: litellm
+        policyTypes:
+        - Ingress
+        - Egress
+        ingress:
+        - from:
+          - podSelector:
+              matchLabels:
+                app: openwebui
+          ports:
+          - protocol: TCP
+            port: 4000
+        egress:
+        # Allow to Ollama Knative service
+        - to:
+          - podSelector:
+              matchLabels:
+                app: ollama
+          ports:
+          - protocol: TCP
+            port: 11434
+        # Allow to Ollama via Knative internal service
+        - to:
+          - namespaceSelector: {}
+          ports:
+          - protocol: TCP
+            port: 80
+          - protocol: TCP
+            port: 11434
+        # Allow DNS
+        - to:
+          - namespaceSelector: {}
+            podSelector:
+              matchLabels:
+                k8s-app: kube-dns
+          ports:
+          - protocol: UDP
+            port: 53
+        # Allow external HTTPS for OpenAI API (hybrid routing)
+        - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+          ports:
+          - protocol: TCP
+            port: 443
+      ---
+      # Allow Ollama to receive traffic from LiteLLM
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: ollama-policy
+        namespace: default
+      spec:
+        podSelector:
+          matchLabels:
+            app: ollama
+        policyTypes:
+        - Ingress
+        - Egress
+        ingress:
+        - from:
+          - podSelector:
+              matchLabels:
+                app: litellm
+          ports:
+          - protocol: TCP
+            port: 11434
+        # Also allow from Knative system for health checks
+        - from:
+          - namespaceSelector:
+              matchLabels:
+                app.kubernetes.io/name: knative-serving
+          ports:
+          - protocol: TCP
+            port: 11434
+        egress:
+        # Allow DNS
+        - to:
+          - namespaceSelector: {}
+            podSelector:
+              matchLabels:
+                k8s-app: kube-dns
+          ports:
+          - protocol: UDP
+            port: 53
+        # Allow external HTTPS for model downloads
+        - to:
+          - ipBlock:
+              cidr: 0.0.0.0/0
+          ports:
+          - protocol: TCP
+            port: 443
+    name: network-policies.yaml
+  targets:
+  - clusterSelector:
+      matchExpressions:
+      - key: clusterclass-name.fleet.addons.cluster.x-k8s.io
+        operator: In
+        values:
+        - docker-llm-clusterclass

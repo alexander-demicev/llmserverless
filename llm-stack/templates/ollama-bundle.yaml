@@ -15,18 +15,18 @@ spec:
         template:
           metadata:
             annotations:
-              autoscaling.knative.dev/min-scale: "1"
-              autoscaling.knative.dev/max-scale: "5"
+              autoscaling.knative.dev/min-scale: {{ .Values.ollama.autoscaling.minScale | quote }}
+              autoscaling.knative.dev/max-scale: {{ .Values.ollama.autoscaling.maxScale | quote }}
               autoscaling.knative.dev/metric: "concurrency"
-              autoscaling.knative.dev/target: "1"
-              autoscaling.knative.dev/window: "30s"
+              autoscaling.knative.dev/target: {{ .Values.ollama.autoscaling.target | quote }}
+              autoscaling.knative.dev/window: {{ .Values.ollama.autoscaling.window | quote }}
             labels:
               app: ollama
           spec:
             terminationGracePeriodSeconds: 30
             containers:
             - name: ollama
-              image: ollama/ollama:latest
+              image: {{ .Values.images.ollama.repository }}:{{ .Values.images.ollama.tag }}
               ports:
               - name: http1
                 containerPort: 11434
@@ -39,11 +39,11 @@ spec:
                 mountPath: /root/.ollama
               resources:
                 requests:
-                  cpu: "500m"
-                  memory: "4Gi"
+                  cpu: {{ .Values.ollama.resources.requests.cpu | quote }}
+                  memory: {{ .Values.ollama.resources.requests.memory | quote }}
                 limits:
-                  cpu: "2"
-                  memory: "8Gi"
+                  cpu: {{ .Values.ollama.resources.limits.cpu | quote }}
+                  memory: {{ .Values.ollama.resources.limits.memory | quote }}
               readinessProbe:
                 exec:
                   command:
@@ -77,6 +77,9 @@ spec:
           port: 11434
           targetPort: 11434
     name: ollama.yaml
+  dependsOn:
+  - name: ollama-startup-config
+  - name: knative-serving-core-part-1
   targets:
   - clusterSelector:
       matchExpressions:

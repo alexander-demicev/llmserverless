@@ -12,7 +12,7 @@ spec:
         name: openwebui
         namespace: default
       spec:
-        replicas: 1
+        replicas: {{ .Values.openwebui.replicas }}
         selector:
           matchLabels:
             app: openwebui
@@ -23,14 +23,17 @@ spec:
           spec:
             containers:
             - name: openwebui
-              image: ghcr.io/open-webui/open-webui:v0.6.10
+              image: {{ .Values.images.openwebui.repository }}:{{ .Values.images.openwebui.tag }}
               ports:
               - containerPort: 8080
               env:
               - name: OPENAI_API_BASE_URL
                 value: "http://litellm-service:4000"
               - name: OPENAI_API_KEY
-                value: "test-master-key"
+                valueFrom:
+                  secretKeyRef:
+                    name: llm-secrets
+                    key: LITELLM_MASTER_KEY
       ---
       apiVersion: v1
       kind: Service
@@ -44,6 +47,9 @@ spec:
         - port: 8080
           targetPort: 8080
     name: openwebui.yaml
+  dependsOn:
+  - name: llm-secrets
+  - name: litellm
   targets:
   - clusterSelector:
       matchExpressions:
